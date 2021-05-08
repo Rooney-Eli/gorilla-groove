@@ -5,6 +5,7 @@ import android.os.SystemClock
 import android.support.v4.media.MediaMetadataCompat
 import android.support.v4.media.session.MediaControllerCompat
 import android.support.v4.media.session.PlaybackStateCompat
+import android.util.Log
 import androidx.hilt.lifecycle.ViewModelInject
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
@@ -37,6 +38,11 @@ class PlayerControlsViewModel @ViewModelInject constructor(
     private val _repeatState: MutableLiveData<Int> = MutableLiveData()
     val repeatState: LiveData<Int>
         get() = _repeatState
+
+    private val _shuffleState: MutableLiveData<Int> = MutableLiveData()
+    val shuffleState: LiveData<Int>
+        get() = _shuffleState
+
 
     private val _isBuffering: MutableLiveData<Boolean> = MutableLiveData()
     val isBuffering: LiveData<Boolean>
@@ -91,6 +97,10 @@ class PlayerControlsViewModel @ViewModelInject constructor(
         _repeatState.postValue(it)
     }
 
+    private val shuffleStateObserver = Observer<Int> {
+        _shuffleState.postValue(it)
+    }
+
     private val currentTimeObserver = Observer<Long> { newTime ->
         if (mediaPosition.value != newTime) {
             mediaPosition.postValue(newTime)
@@ -119,6 +129,7 @@ class PlayerControlsViewModel @ViewModelInject constructor(
         it.playbackState.observeForever(playbackStateObserver)
         it.nowPlaying.observeForever(mediaMetadataObserver)
         it.repeatState.observeForever(repeatStateObserver)
+        it.shuffleState.observeForever(shuffleStateObserver)
         it.currentSongTimeMillis.observeForever(currentTimeObserver)
     }
 
@@ -174,12 +185,25 @@ class PlayerControlsViewModel @ViewModelInject constructor(
         }
     }
 
+    fun shuffle() {
+        when(_shuffleState.value) {
+            PlaybackStateCompat.SHUFFLE_MODE_NONE -> {
+                transportControls.setShuffleMode(PlaybackStateCompat.SHUFFLE_MODE_ALL)
+            }
+            PlaybackStateCompat.SHUFFLE_MODE_ALL -> {
+                transportControls.setShuffleMode(PlaybackStateCompat.SHUFFLE_MODE_NONE)
+            }
+        }
+    }
+
+
 
     override fun onCleared() {
         super.onCleared()
         musicServiceConnection.playbackState.removeObserver(playbackStateObserver)
         musicServiceConnection.nowPlaying.removeObserver(mediaMetadataObserver)
         musicServiceConnection.repeatState.removeObserver(repeatStateObserver)
+        musicServiceConnection.shuffleState.removeObserver(shuffleStateObserver)
         musicServiceConnection.currentSongTimeMillis.observeForever(currentTimeObserver)
         updatePosition = false
     }

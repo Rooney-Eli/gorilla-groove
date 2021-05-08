@@ -27,6 +27,7 @@ class MusicServiceConnection(
     val networkFailure = KtLiveData(false)
     val playbackState = KtLiveData(EMPTY_PLAYBACK_STATE)
     val repeatState = KtLiveData(PlaybackStateCompat.REPEAT_MODE_NONE)
+    val shuffleState = KtLiveData(PlaybackStateCompat.SHUFFLE_MODE_NONE)
     val nowPlaying = KtLiveData(NOTHING_PLAYING)
     val currentSongTimeMillis = KtLiveData(0L)
 
@@ -112,6 +113,12 @@ class MusicServiceConnection(
             logInfo("Repeat mode was changed to $repeatMode")
 
             repeatState.postValue(repeatMode)
+        }
+
+        override fun onShuffleModeChanged(shuffleMode: Int) {
+            logInfo("Shuffle mode was changed to $shuffleMode")
+
+            shuffleState.postValue(shuffleMode)
         }
 
         override fun onMetadataChanged(metadata: MediaMetadataCompat?) {

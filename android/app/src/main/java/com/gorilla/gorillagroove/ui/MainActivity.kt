@@ -124,6 +124,10 @@ class MainActivity : AppCompatActivity() {
             playerControlsViewModel.repeat()
         }
 
+        shuffle_button.setOnClickListener {
+            playerControlsViewModel.shuffle()
+        }
+
         next_button.setOnClickListener {
             playerControlsViewModel.skipToNext()
         }
@@ -189,6 +193,19 @@ class MainActivity : AppCompatActivity() {
                 }
                 else -> {
                     //Log.d(TAG, "subscribeObservers: what is this? ${it}")
+                }
+            }
+        })
+
+        playerControlsViewModel.shuffleState.observe(this, {
+            when(it) {
+                SHUFFLE_MODE_NONE -> {
+                    shuffle_button.setImageResource(R.drawable.ic_shuffle_24)
+                    shuffle_button.setColorFilter(ContextCompat.getColor(this, R.color.exo_white), android.graphics.PorterDuff.Mode.SRC_IN)
+                }
+                SHUFFLE_MODE_ALL -> {
+                    shuffle_button.setImageResource(R.drawable.ic_shuffle_24)
+                    shuffle_button.setColorFilter(ContextCompat.getColor(this, R.color.ggSecondary), android.graphics.PorterDuff.Mode.SRC_IN)
                 }
             }
         })

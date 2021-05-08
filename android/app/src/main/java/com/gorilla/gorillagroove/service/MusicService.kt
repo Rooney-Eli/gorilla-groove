@@ -9,17 +9,19 @@ import android.support.v4.media.MediaBrowserCompat
 import android.support.v4.media.MediaDescriptionCompat
 import android.support.v4.media.session.MediaSessionCompat
 import android.support.v4.media.session.PlaybackStateCompat
+import android.util.Log
 import androidx.media.MediaBrowserServiceCompat
 import com.google.android.exoplayer2.*
-import com.gorilla.gorillagroove.repository.MainRepository
-import com.gorilla.gorillagroove.util.Constants.MEDIA_ROOT_ID
 import com.google.android.exoplayer2.ext.mediasession.MediaSessionConnector
+import com.google.android.exoplayer2.ext.mediasession.RepeatModeActionProvider
 import com.google.android.exoplayer2.ext.mediasession.TimelineQueueNavigator
 import com.google.android.exoplayer2.source.ConcatenatingMediaSource
+import com.gorilla.gorillagroove.repository.MainRepository
 import com.gorilla.gorillagroove.service.GGLog.logDebug
 import com.gorilla.gorillagroove.service.GGLog.logError
 import com.gorilla.gorillagroove.service.GGLog.logInfo
 import com.gorilla.gorillagroove.service.GGLog.logWarn
+import com.gorilla.gorillagroove.util.Constants.MEDIA_ROOT_ID
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.*
 import javax.inject.Inject
@@ -76,6 +78,7 @@ class MusicService : MediaBrowserServiceCompat() {
         mediaSessionConnector.setPlaybackPreparer(MusicPlaybackPreparer())
         mediaSessionConnector.setQueueNavigator(MusicQueueNavigator())
         mediaSessionConnector.setPlayer(exoPlayer)
+        mediaSessionConnector.setCustomActionProviders(RepeatModeActionProvider(this), ShuffleModeActionProvider())
 
         exoPlayer.addListener(musicPlayerEventListener)
 
@@ -122,7 +125,11 @@ class MusicService : MediaBrowserServiceCompat() {
 
             // If the exoplayer encounters an error, you have to re-prepare the entire thing. Pretty jank. It won't even try to play anything anymore unless you do so.
             // https://github.com/google/ExoPlayer/issues/4343
-            preparePlayer(repo.nowPlayingConcatenatingMediaSource, repo.currentIndex, exoPlayer.currentPosition)
+            preparePlayer(
+                repo.nowPlayingConcatenatingMediaSource,
+                repo.currentIndex,
+                exoPlayer.currentPosition
+            )
         }
 
         override fun onPositionDiscontinuity(reason: Int) {
@@ -141,7 +148,8 @@ class MusicService : MediaBrowserServiceCompat() {
                 Player.DISCONTINUITY_REASON_INTERNAL -> {
                     //Log.d(TAG, "onPositionDiscontinuity: reason internal")
                 }
-                Player.DISCONTINUITY_REASON_AD_INSERTION -> { }
+                Player.DISCONTINUITY_REASON_AD_INSERTION -> {
+                }
             }
         }
     }
@@ -149,6 +157,28 @@ class MusicService : MediaBrowserServiceCompat() {
     private inner class MusicQueueNavigator : TimelineQueueNavigator(mediaSession) {
         override fun getMediaDescription(player: Player, windowIndex: Int): MediaDescriptionCompat {
             return repo.nowPlayingMetadataList[windowIndex].description
+        }
+    }
+
+    private inner class ShuffleModeActionProvider : MediaSessionConnector.CustomActionProvider {
+        override fun onCustomAction(
+            player: Player,
+            controlDispatcher: ControlDispatcher,
+            action: String,
+            extras: Bundle?
+        ) {
+            controlDispatcher.dispatchSetShuffleModeEnabled(player, !player.shuffleModeEnabled)
+        }
+
+        override fun getCustomAction(player: Player): PlaybackStateCompat.CustomAction? {
+
+            val icon = resources.getIdentifier("ic_shuffle_24", "drawable", packageName)
+
+            val custom =  PlaybackStateCompat.CustomAction.Builder(
+                "ACTION_SHUFFLE_MODE", "actionLabel", icon
+            ).build()
+
+            return custom
         }
     }
 
@@ -161,14 +191,17 @@ class MusicService : MediaBrowserServiceCompat() {
                     PlaybackStateCompat.ACTION_PLAY_FROM_SEARCH or
                     PlaybackStateCompat.ACTION_PREPARE_FROM_URI or
                     PlaybackStateCompat.ACTION_PLAY_FROM_URI or
-                    PlaybackStateCompat.ACTION_SET_REPEAT_MODE
+                    PlaybackStateCompat.ACTION_SET_REPEAT_MODE or
+                    PlaybackStateCompat.ACTION_SET_SHUFFLE_MODE
 
         override fun onPrepare(playWhenReady: Boolean) = Unit
         override fun onPrepareFromMediaId(mediaId: String, playWhenReady: Boolean, extras: Bundle?) {
             logDebug("Preparing media with ID: $mediaId")
 
             val itemToPlay = repo.nowPlayingMetadataList.find { it.id == mediaId }
-            val songIndex = if (itemToPlay == null) 0 else repo.nowPlayingMetadataList.indexOf(itemToPlay)
+            val songIndex = if (itemToPlay == null) 0 else repo.nowPlayingMetadataList.indexOf(
+                itemToPlay
+            )
 
             if (repo.dataSetChanged) {
                 preparePlayer(repo.nowPlayingConcatenatingMediaSource, songIndex)
@@ -188,6 +221,7 @@ class MusicService : MediaBrowserServiceCompat() {
             extras: Bundle?,
             cb: ResultReceiver?
         ) = false
+
     }
 
     private fun preparePlayer(
@@ -228,7 +262,10 @@ class MusicService : MediaBrowserServiceCompat() {
         return BrowserRoot(MEDIA_ROOT_ID, null)
     }
 
-    override fun onLoadChildren(parentId: String, result: Result<MutableList<MediaBrowserCompat.MediaItem>>) {
+    override fun onLoadChildren(
+        parentId: String,
+        result: Result<MutableList<MediaBrowserCompat.MediaItem>>
+    ) {
         when (parentId) {
             MEDIA_ROOT_ID -> {
                 result.sendResult(null)
